@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Iframe Image Replacer</title>
+
+  <style>
+    html, body {
+      margin: 0;
+      height: 100%;
+      font-family: Arial, sans-serif;
+    }
+
+    #toolbar {
+      height: 50px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0 10px;
+      box-sizing: border-box;
+      background: #222;
+    }
+
+    #url {
+      flex: 1;
+      height: 32px;
+      box-sizing: border-box;
+      padding: 0 10px;
+    }
+
+    button {
+      height: 32px;
+      padding: 0 15px;
+      cursor: pointer;
+    }
+
+    #frame {
+      display: block;
+      width: 100%;
+      height: calc(100% - 50px);
+      border: 0;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div id="toolbar">
+    <input
+      id="url"
+      type="url"
+      placeholder="https://example.com"
+      value="https://example.com"
+    >
+
+    <button id="load">Load</button>
+  </div>
+
+  <iframe id="frame"></iframe>
+
+  <script>
+    // ==========================================
+    // FIXED IMAGE URL
+    // The user cannot change this through the UI.
+    // ==========================================
+    const REPLACEMENT_IMAGE =
+      "https://example.com/replacement.png";
+
+
+    const urlInput = document.getElementById("url");
+    const loadButton = document.getElementById("load");
+    const frame = document.getElementById("frame");
+
+
+    function replaceImages(document) {
+      const images = document.querySelectorAll("img");
+
+      images.forEach(img => {
+        img.src = REPLACEMENT_IMAGE;
+
+        // Optional: prevent srcset from restoring another image.
+        img.removeAttribute("srcset");
+
+        // Optional: prevent lazy-loading behavior.
+        img.removeAttribute("data-src");
+        img.removeAttribute("data-srcset");
+      });
+    }
+
+
+    function observeImages(document) {
+      const observer = new MutationObserver(mutations => {
+        for (const mutation of mutations) {
+          for (const node of mutation.addedNodes) {
+            if (node.nodeType !== Node.ELEMENT_NODE) {
+              continue;
+            }
+
+            // If the added node itself is an image.
+            if (node.tagName === "IMG") {
+              node.src = REPLACEMENT_IMAGE;
+              node.removeAttribute("srcset");
+            }
+
+            // Images contained inside the added node.
+            const images = node.querySelectorAll?.("img");
+
+            if (images) {
+              images.forEach(img => {
+                img.src = REPLACEMENT_IMAGE;
+                img.removeAttribute("srcset");
+              });
+            }
+          }
+        }
+      });
+
+      observer.observe(document.documentElement, {
+        childList: true,
+        subtree: true
+      });
+    }
+
+
+    frame.addEventListener("load", () => {
+      try {
+        const iframeDocument =
+          frame.contentDocument ||
+          frame.contentWindow.document;
+
+        // Replace images that already exist.
+        replaceImages(iframeDocument);
+
+        // Replace images added later by JavaScript.
+        observeImages(iframeDocument);
+
+      } catch (error) {
+        console.error(
+          "Cannot access iframe contents.",
+          error
+        );
+
+        console.error(
+          "The iframe page is probably on a different origin."
+        );
+      }
+    });
+
+
+    function loadPage() {
+      let url = urlInput.value.trim();
+
+      if (!url) {
+        return;
+      }
+
+      // Add HTTPS if the user omitted a protocol.
+      if (!/^https?:\/\//i.test(url)) {
+        url = "https://" + url;
+      }
+
+      frame.src = url;
+    }
+
+
+    loadButton.addEventListener("click", loadPage);
+
+    urlInput.addEventListener("keydown", event => {
+      if (event.key === "Enter") {
+        loadPage();
+      }
+    });
+
+
+    // Load initial page.
+    loadPage();
+  </script>
+
+</body>
+</html>
